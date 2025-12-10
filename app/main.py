@@ -522,6 +522,49 @@ def global_compare(user_id):
 
     return render_template("global_insights.html", info=insights)
     
+# ==========================================
+#   edit profile
+# ==========================================
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    user_id = session["user_id"]
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    if request.method == "POST":
+        display_name = request.form.get("display_name")
+        country_code = request.form.get("country_code")
+        birth_year = request.form.get("birth_year") or None
+        avatar_url = request.form.get("avatar_url") or None
+
+        cursor.execute("""
+            UPDATE core_user_profile
+            SET display_name=%s, country_code=%s, birth_year=%s, avatar_url=%s
+            WHERE user_id=%s
+        """, (display_name, country_code, birth_year, avatar_url, user_id))
+        db.commit()
+
+        cursor.close()
+        return redirect("/profile")
+
+    # GET — Load form with existing profile values
+    cursor.execute("""
+        SELECT display_name, country_code, birth_year, avatar_url
+        FROM core_user_profile WHERE user_id=%s
+    """, (user_id,))
+    profile = cursor.fetchone()
+
+    # Load country dropdown list
+    cursor.execute("SELECT country_code, name FROM ref_country ORDER BY name")
+    countries = cursor.fetchall()
+
+    cursor.close()
+    return render_template("profile.html",
+                           profile=profile,
+                           countries=countries)
+
+    
     
 # ==========================================
 #   comunity insights (Last.fm)
