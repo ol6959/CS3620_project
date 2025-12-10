@@ -22,7 +22,7 @@ print("📥 Importing Last.fm data...")
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="Lyo265155!",
+    password="YOUR_PASSWORD",
     database="tunetracker"
 )
 cursor = db.cursor()
