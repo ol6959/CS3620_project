@@ -1,2 +1,8 @@
-Flask==3.0.0
-mysql-connector-python==8.3.0
+flask
+mysql-connector-python
+pandas
+python-dotenv
+werkzeug
+jinja2
+itsdangerous
+click
