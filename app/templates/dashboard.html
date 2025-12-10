@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Dashboard</title>
+</head>
+<body>
+
+<h1>📊 Your Listening Dashboard</h1>
+{% if user.avatar_url %}
+    <img src="{{ user.avatar_url }}" alt="Avatar" width="120" height="120" style="border-radius:50%; margin-bottom:10px;">
+{% endif %}
+<h1>{{ user.display_name }}'s Dashboard</h1>
+
+
+{% if summary %}
+    <p><strong>Total Listens:</strong> {{ summary.total_listens }}</p>
+    <p><strong>Unique Tracks:</strong> {{ summary.unique_tracks }}</p>
+    <p><strong>Active Days:</strong> {{ summary.active_days }}</p>
+{% else %}
+    <p>No listening history yet.</p>
+{% endif %}
+
+<h2>🎤 Top Artists</h2>
+<ul>
+{% for artist in top_artists %}
+    <li>{{ artist.artist_name }} — {{ artist.listens }} listens</li>
+{% else %}
+    <li>No artist stats yet.</li>
+{% endfor %}
+</ul>
+
+<h2>📈 Listening Trend (Last 7 Days)</h2>
+<ul>
+{% for row in trend %}
+    <li>{{ row.day }} — {{ row.listens }} listens</li>
+{% else %}
+    <li>No trend yet.</li>
+{% endfor %}
+</ul>
+
+<a href="/log_listen">Log more listens</a> |
+<a href="/">Home</a>
+
+</body>
+</html>
+
+

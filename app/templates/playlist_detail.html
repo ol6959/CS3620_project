@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ playlist.name }}</title>
+</head>
+<body>
+    <h1>🎵 Playlist: {{ playlist.name }}</h1>
+
+    <a href="/playlists">← Back to Playlists</a>
+    <a href="/playlist/add_track">＋ Add Track</a>
+
+    {% if tracks %}
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>#</th>
+                <th>Track</th>
+                <th>Artist</th>
+            </tr>
+            {% for t in tracks %}
+            <tr>
+                <td>{{ t.position }}</td>
+                <td>{{ t.title }}</td>
+                <td>{{ t.artists }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No tracks yet — add some! 🎶</p>
+    {% endif %}
+</body>
+</html>
+

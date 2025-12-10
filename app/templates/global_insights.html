@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Global Insights | TuneTracker</title>
+</head>
+<body>
+    <h1>🌍 Global Insights</h1>
+
+    {% if info %}
+        <h3>Your Country: {{ info.country_name }}</h3>
+        <p><b>Region:</b> {{ info.region }}</p>
+        <p><b>GDP per Capita:</b>
+            {% if info.gdp_per_capita %}
+                ${{ "%.0f" | format(info.gdp_per_capita) }}
+            {% else %}
+                Not available
+            {% endif %}
+        </p>
+
+        <p><b>Internet Usage:</b>
+            {% if info.internet_usage %}
+                {{ "%.1f" | format(info.internet_usage) }}%
+            {% else %}
+                Not available
+            {% endif %}
+        </p>
+
+
+        <h3>Interpretation</h3>
+        <p>
+        {% if info.internet_usage is not none and info.internet_usage > 80 %}
+            <p>🌐 Internet access is widely available — great for streaming!</p>
+        {% elif info.internet_usage is not none %}
+            <p>🌐 Internet access is growing — streaming availability may vary.</p>
+        {% else %}
+            <p>🌐 Internet access data not available.</p>
+        {% endif %}
+
+        </p>
+    {% else %}
+        <p>No global context data found!</p>
+    {% endif %}
+
+    <p><a href="/">← Back Home</a></p>
+</body>
+</html>
+

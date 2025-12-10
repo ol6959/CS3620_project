@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Playlists | TuneTracker</title>
+</head>
+<body>
+    <h1>🎶 My Playlists</h1>
+
+    {% if playlists %}
+        <ul>
+        {% for p in playlists %}
+            <li>
+                <a href="/playlist/{{ p.playlist_id }}">
+                    {{ p.name }}
+                </a>
+                (created {{ p.created_at }})
+            </li>
+
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>You don't have any playlists yet!</p>
+    {% endif %}
+
+    <p><a href="/playlist">Create a new Playlist</a></p>
+    <p><a href="/">← Back Home</a></p>
+</body>
+</html>

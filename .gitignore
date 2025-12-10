@@ -1,0 +1,15 @@
+# Ignore datasets
+app/data
+*.csv
+*.zip
+*.json
+
+# Ignore virtual environment
+venv/
+.env/
+
+# Ignore macOS junk
+.DS_Store
+
+# Ignore MySQL dump attachments
+*.sql

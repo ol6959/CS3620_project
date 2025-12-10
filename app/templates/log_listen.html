@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log Listen | TuneTracker</title>
+    <style>
+        .track-result { margin: 8px 0; }
+        button { margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Log a Listen</h1>
+
+    <input type="text" id="search" placeholder="Search songs..." autofocus>
+    <div id="results"></div>
+
+    <p><a href="/">← Back Home</a></p>
+
+    <script>
+        document.getElementById("search").addEventListener("input", async function () {
+            const q = this.value;
+            if (q.length < 2) {
+                document.getElementById("results").innerHTML = "";
+                return;
+            }
+
+            const res = await fetch(`/search_tracks?q=${encodeURIComponent(q)}`);
+            const songs = await res.json();
+
+            let html = "";
+            songs.forEach(s => {
+                html += `
+                    <div class="track-result">
+                        <b>${s.title}</b> — ${s.artists || "Unknown Artist"}
+                        <form method="POST" action="/listen" style="display:inline;">
+                            <input type="hidden" name="track_id" value="${s.track_id}">
+                            <button>Log Listen</button>
+                        </form>
+                    </div>`;
+            });
+
+            document.getElementById("results").innerHTML = html;
+        });
+    </script>
+</body>
+</html>
+

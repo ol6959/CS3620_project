@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile Settings</title>
+</head>
+<body>
+
+<h2>🎭 Edit Profile</h2>
+{% if errors %}
+    <div style="color: red; border: 1px solid red; padding: 10px; margin-bottom: 10px;">
+        <strong>⚠ Please fix the following:</strong>
+        <ul>
+        {% for err in errors %}
+            <li>{{ err }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+
+{% if profile.avatar_url %}
+    <img src="{{ profile.avatar_url }}"
+         style="width:100px;height:100px;border-radius:50%;"><br>
+{% endif %}
+
+<form action="/profile" method="POST">
+
+    <label>Display Name:</label><br>
+    <input type="text" name="display_name" value="{{ profile.display_name }}"><br><br>
+
+    <label>Country Code:</label><br>
+    <select name="country_code" required>
+        {% for c in countries %}
+            <option value="{{ c.country_code }}"
+                {% if c.country_code == profile.country_code %}selected{% endif %}>
+                {{ c.name }} ({{ c.country_code }})
+            </option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>Birth Year:</label><br>
+    <input type="number" name="birth_year" value="{{ profile.birth_year }}"><br><br>
+
+    <label>Avatar Image URL:</label><br>
+    <input type="text" name="avatar_url" value="{{ profile.avatar_url }}"><br><br>
+
+    <button type="submit">Save Changes</button>
+</form>
+
+<br>
+<a href="/dashboard">Back to Dashboard</a>
+
+</body>
+</html>
+

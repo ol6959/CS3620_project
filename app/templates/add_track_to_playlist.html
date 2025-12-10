@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Track to Playlist | TuneTracker</title>
+</head>
+<body>
+
+    <h1>➕ Add Track to Playlist</h1>
+
+    <form action="/playlist/add_track" method="POST">
+        
+        <label>Select Playlist:</label><br>
+        <select name="playlist_id" required>
+            {% for pl in playlists %}
+                <option value="{{ pl.playlist_id }}">{{ pl.name }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <label>Search Track:</label><br>
+        <input type="text" id="trackSearch" placeholder="Search by title or artist..." autocomplete="off">
+        <ul id="searchResults" style="border:1px solid #ccc; max-height:150px; overflow-y:auto;">
+        </ul>
+
+        <input type="hidden" name="track_id" id="selectedTrack">
+
+
+        <button type="submit">Add to Playlist</button>
+    </form>
+
+    <p><a href="/">← Back Home</a></p>
+    
+    <script>
+    document.getElementById("trackSearch").addEventListener("input", function () {
+        const q = this.value;
+        if (!q) {
+            document.getElementById("searchResults").innerHTML = "";
+            return;
+        }
+
+        fetch(`/search_tracks?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                const list = document.getElementById("searchResults");
+                list.innerHTML = "";
+
+                data.forEach(track => {
+                    const li = document.createElement("li");
+                    li.textContent = `${track.title} — ${track.artists}`;
+                    li.style.cursor = "pointer";
+
+                    li.onclick = function () {
+                        document.getElementById("selectedTrack").value = track.track_id;
+                        document.getElementById("trackSearch").value = li.textContent;
+                        list.innerHTML = "";
+                    };
+
+                    list.appendChild(li);
+                });
+            });
+    });
+    </script>
+
+
+</body>
+</html>
+

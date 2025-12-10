@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recommended For You</title>
+</head>
+<body>
+    <h1>🎵 Recommended for You</h1>
+
+    <a href="/">⬅ Back Home</a>
+    <hr>
+
+    {% if recs %}
+        <ul>
+        {% for r in recs %}
+            <li>
+                <strong>{{ r.title }}</strong>
+                — {{ r.artist_name or "Unknown Artist" }}
+                | <a href="/listen?track_id={{ r.track_id }}">Log Listen</a>
+                | <a href="/playlist/add_track?track_id={{ r.track_id }}">Add to Playlist</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No recommendations yet — listen to a few tracks first!</p>
+    {% endif %}
+
+</body>
+</html>
+

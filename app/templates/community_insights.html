@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Community Insights | TuneTracker</title>
+</head>
+<body>
+    <h1>🎙 Top Artists in the Community According to LastFm</h1>
+
+    <ul>
+    {% for a in artists %}
+        <li><b>{{ a.artist }}</b> — {{ a.plays }} listens</li>
+    {% endfor %}
+    </ul>
+
+    <p><a href="/">← Back Home</a></p>
+</body>
+</html>
+
