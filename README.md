@@ -73,11 +73,12 @@ Build Instructions:
         SELECT COUNT(*) FROM ref_country;
         SELECT COUNT(*) FROM world_bank_indicator;
         
-        
-
-        -- analytics
-        SELECT * FROM v_user_top_tracks LIMIT 20;
-        SELECT * FROM v_recommendation_explorer LIMIT 20;
+        should get results around:
+        113999
+        31407
+        181153
+        263
+        17577
         
     8. run program with python main.py
 
