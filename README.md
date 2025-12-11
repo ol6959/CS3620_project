@@ -20,21 +20,26 @@ Databases Used:
     
 
 Build Instructions:
-    1. install python and packages under requirements.txt
+    1. Install python and packages under requirements.txt
         pip install -r requirements.txt
         I used a venv using these commands
             python3 -m venv venv
             source venv/bin/activate     # macOS/Linux
             venv\Scripts\activate        # Windows
             pip install -r requirements.txt
+            
+    2. Create databases with sql files under TuneTracker/app
+        schema.sql
+        analytic_views.sql
+        optional to create some user to start: sample_data.sql
 
-    2. create the schema: mysql -u root -p < db/schema.sql
+    3. Create the schema: mysql -u root -p < db/schema.sql
     
-    3. Download all the databases we used
+    4. Download all the databases we used
     
-    4. Put all the .csv files into the TuneTracker/app/data directory
+    5. Put all the .csv files into the TuneTracker/app/data directory
     
-    5. Update all the import python scripts under TuneTracker/app to match your SQL user login. It should look something like this before:
+    6. Update all the import python scripts under TuneTracker/app to match your SQL user login. It should look something like this before:
             db = mysql.connector.connect(
                 host="localhost",
                 user="root",
@@ -42,7 +47,7 @@ Build Instructions:
                 database="tunetracker"
             )
             
-    6. Run import scripts (I used a venv):
+    7. Run import scripts (I used a venv):
         python import_spotify_final.py  - inserts artist into music_artist and tracks into music_track and connects them
         
         python import_lastfm.py  - loads listens to show popular songs
@@ -51,12 +56,6 @@ Build Instructions:
         &                                   - populates world_bank_country, indicator, and data
         python import_world_bank_data.py
         
-    7. Confirm everything imported correctly by using the analytic view
+    8. Confirm everything imported correctly by using the analytic view
 
-
-
-To see analytic view (from demo video):
-    SELECT COUNT(*) FROM music_track;
-    SELECT COUNT(*) FROM ext_lastfm_listens;
-    SELECT COUNT(*) FROM world_bank_data;
 
