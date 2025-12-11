@@ -28,17 +28,15 @@ Build Instructions:
             venv\Scripts\activate        # Windows
             pip install -r requirements.txt
             
-    2. Create databases with sql files under TuneTracker/app
+    2. Download all the databases we used
+    
+    3. Put all the .csv files into the TuneTracker/app/data directory
+    
+    4. Create databases by running sql files under TuneTracker/app
         schema.sql
         analytic_views.sql
-
-    3. Create the schema: mysql -u root -p < db/schema.sql
     
-    4. Download all the databases we used
-    
-    5. Put all the .csv files into the TuneTracker/app/data directory
-    
-    6. Update all the import python scripts under TuneTracker/app to match your SQL user login. It should look something like this before:
+    5. Update all the import python scripts under TuneTracker/app to match your SQL user login. It should look something like this before:
             db = mysql.connector.connect(
                 host="localhost",
                 user="root",
@@ -56,8 +54,8 @@ Build Instructions:
                 
                 main.py
             
-    7. Run import scripts (I used a venv):
-        python import_spotify_final.py  - inserts artist into music_artist and tracks into music_track and connects them
+    6. Run import scripts (I used a venv):
+        python import_spotify_final.py  - inserts artist into music_artist and tracks into music_track and connects them (may take a while)
         
         python import_lastfm.py  - loads listens to show popular songs
         
@@ -65,17 +63,21 @@ Build Instructions:
         &                                   - populates world_bank_country, indicator, and data
         python import_world_bank_data.py
         
-        OPTIONAL - Create sample users and playlists with sample_data.sql
+        OPTIONAL - Create sample users and playlists by running sample_data.sql
         
-    8. Confirm everything imported correctly
+    7. Confirm everything imported correctly (optional)
         SELECT COUNT(*) FROM music_track;
         SELECT COUNT(*) FROM music_artist;
         SELECT COUNT(*) FROM ext_lastfm_listens;
         SELECT COUNT(*) FROM ref_country;
         SELECT COUNT(*) FROM world_bank_indicator;
+        
+        
 
         -- analytics
         SELECT * FROM v_user_top_tracks LIMIT 20;
         SELECT * FROM v_recommendation_explorer LIMIT 20;
+        
+    8. run program with python main.py
 
 

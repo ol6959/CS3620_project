@@ -198,10 +198,17 @@ def log_listen_page():
     return render_template("log_listen.html", tracks=tracks)
 
 
-@app.route("/listen", methods=["POST"])
+@app.route("/listen", methods=["GET", "POST"])
 def listen():
     if "user_id" not in session:
         return redirect("/login")
+
+    # GET: track_id comes from query string
+    # POST: track_id comes from form data
+    track_id = request.values.get("track_id")
+
+    if not track_id:
+        return "Missing track_id", 400
 
     db = get_db()
     cursor = db.cursor()
@@ -209,11 +216,15 @@ def listen():
     cursor.execute("""
         INSERT INTO core_listen_event (user_id, track_id, played_at)
         VALUES (%s, %s, NOW())
-    """, (session["user_id"], request.form.get("track_id")))
+    """, (session["user_id"], track_id))
 
     db.commit()
     cursor.close()
-    return redirect("/log_listen")
+
+    # For GET request: redirect back
+    # For POST from forms: redirect back
+    return redirect(request.headers.get("Referer", "/log_listen"))
+
 
 
 # ------------------------------------
@@ -426,17 +437,15 @@ def recs_api():
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
-        SELECT r.track_id,
-               t.title,
-               GROUP_CONCAT(a.name SEPARATOR ', ') AS artists,
-               t.popularity
-        FROM v_recommendation_explorer r
-        JOIN music_track t ON r.track_id = t.track_id
-        JOIN music_track_artist mta ON t.track_id = mta.track_id
-        JOIN music_artist a ON mta.artist_id = a.artist_id
+        SELECT 
+            r.track_id,
+            MAX(r.title) AS title,
+            GROUP_CONCAT(DISTINCT r.artist_name SEPARATOR ', ') AS artists,
+            MAX(r.popularity) AS popularity
+        FROM v_recommendation_genre r
         WHERE r.user_id = %s
         GROUP BY r.track_id
-        ORDER BY t.popularity DESC
+        ORDER BY popularity DESC
         LIMIT 20
     """, (user_id,))
 
@@ -453,21 +462,26 @@ def recs_ui():
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
-        SELECT r.track_id,
-               t.title,
-               (SELECT name FROM music_artist a
-                JOIN music_track_artist mta ON a.artist_id = mta.artist_id
-                WHERE mta.track_id = t.track_id LIMIT 1) AS artist_name
-        FROM v_recommendation_explorer r
+        SELECT 
+            r.track_id,
+            MAX(t.title) AS title, 
+            GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR ', ') AS artists,
+            MAX(t.popularity) AS popularity,
+            MAX(r.genre_name) AS genre
+        FROM v_recommendation_genre r
         JOIN music_track t ON r.track_id = t.track_id
+        JOIN music_track_artist mta ON t.track_id = mta.track_id
+        JOIN music_artist a ON mta.artist_id = a.artist_id
         WHERE r.user_id = %s
-        ORDER BY t.popularity DESC
+        GROUP BY r.track_id
+        ORDER BY popularity DESC
         LIMIT 20
     """, (user_id,))
 
     recs = cursor.fetchall()
     cursor.close()
     return render_template("recs_ui.html", recs=recs)
+
     
     
 # ------------------------------------
@@ -497,7 +511,7 @@ def global_compare(user_id):
     # Get latest GDP + internet usage
     cursor.execute("""
         SELECT i.indicator_code, b.value
-        FROM bg_country_indicator b
+        FROM world_bank_indicator b
         JOIN ref_indicator i ON b.indicator_code = i.indicator_code
         WHERE b.country_code = %s
           AND b.indicator_code IN ("NY.GDP.PCAP.KD", "IT.NET.USER.ZS")

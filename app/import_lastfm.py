@@ -30,14 +30,11 @@ cursor = db.cursor()
 with open(CSV_FILE, newline="", encoding="utf-8") as f:
     reader = csv.reader(f)
     
-    header = next(reader)  # read the header row
+    header = next(reader)
     print("Header columns:", header)
 
-    # Trim BOM and strip whitespace
     header = [h.replace("\ufeff", "").strip() for h in header]
 
-    # Expected column positions:
-    # ['', 'Username', 'Artist', 'Track', 'Album', 'Date', 'Time']
     idx = {
         "Username": header.index("Username"),
         "Artist": header.index("Artist"),
@@ -52,7 +49,7 @@ with open(CSV_FILE, newline="", encoding="utf-8") as f:
 
     for row in reader:
         if len(row) < len(header):
-            continue  # skip bad lines
+            continue
 
         count += 1
         batch.append((
@@ -63,6 +60,7 @@ with open(CSV_FILE, newline="", encoding="utf-8") as f:
             parse_date(row[idx["Date"]].strip()),
             parse_time(row[idx["Time"]].strip())
         ))
+
         # Batch insert every 5,000 rows
         if len(batch) >= 5000:
             cursor.executemany("""
@@ -74,6 +72,30 @@ with open(CSV_FILE, newline="", encoding="utf-8") as f:
             print(f"Inserted {count:,} rows...")
             batch = []
 
+            # -------------------------------
+            # MAP after batch insert
+            # -------------------------------
+            cursor.execute("""
+                INSERT IGNORE INTO map_lastfm_track (lastfm_id, track_id)
+                SELECT 
+                    l.id,
+                    t.track_id
+                FROM ext_lastfm_listens l
+                JOIN music_track t 
+                    ON LOWER(l.track_name) = LOWER(t.title)
+                JOIN music_track_artist mta 
+                    ON t.track_id = mta.track_id
+                JOIN music_artist a 
+                    ON mta.artist_id = a.artist_id
+                WHERE LOWER(l.artist_name) = LOWER(a.name)
+                  AND NOT EXISTS (
+                        SELECT 1 
+                        FROM map_lastfm_track m 
+                        WHERE m.lastfm_id = l.id
+                  );
+            """)
+            db.commit()
+
     # Insert remaining rows
     if batch:
         cursor.executemany("""
@@ -83,8 +105,33 @@ with open(CSV_FILE, newline="", encoding="utf-8") as f:
         """, batch)
         db.commit()
 
+        # ---------------------------
+        # FINAL mapping pass
+        # ---------------------------
+        cursor.execute("""
+            INSERT IGNORE INTO map_lastfm_track (lastfm_id, track_id)
+            SELECT 
+                l.id,
+                t.track_id
+            FROM ext_lastfm_listens l
+            JOIN music_track t 
+                ON LOWER(l.track_name) = LOWER(t.title)
+            JOIN music_track_artist mta 
+                ON t.track_id = mta.track_id
+            JOIN music_artist a 
+                ON mta.artist_id = a.artist_id
+            WHERE LOWER(l.artist_name) = LOWER(a.name)
+              AND NOT EXISTS (
+                    SELECT 1 
+                    FROM map_lastfm_track m 
+                    WHERE m.lastfm_id = l.id
+              );
+        """)
+        db.commit()
+
 cursor.close()
 db.close()
 
 print(f"🎉 Done! Imported {count:,} Last.fm listens into database.")
+print("🎧 Mapping complete — Last.fm tracks linked to Spotify!")
 

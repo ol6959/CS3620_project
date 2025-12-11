@@ -82,7 +82,7 @@ CREATE TABLE music_album (
 
 CREATE TABLE music_track (
     track_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
+    title VARCHAR(500) NOT NULL,
     album_name VARCHAR(255),
     duration_ms INT,
     popularity TINYINT,              -- 0–100 from Spotify
@@ -246,7 +246,6 @@ CREATE TABLE mart_user_daily_listening (
 
 
 
--- Recommendation Explorer (Genre-Based)
 CREATE OR REPLACE VIEW v_recommendation_explorer AS
 SELECT
     u.user_id,
@@ -256,17 +255,88 @@ SELECT
     g.name AS genre_name,
     t.popularity
 FROM core_user u
-CROSS JOIN music_track t
+JOIN music_track t
 JOIN music_track_genre tg ON t.track_id = tg.track_id
 JOIN ref_genre g ON tg.genre_id = g.genre_id
 JOIN music_track_artist mta ON t.track_id = mta.track_id
 JOIN music_artist a ON mta.artist_id = a.artist_id
 WHERE t.popularity IS NOT NULL
   AND t.track_id NOT IN (
-      SELECT track_id FROM core_listen_event le
-      WHERE le.user_id = u.user_id
-  )
-GROUP BY u.user_id, t.track_id;
+        SELECT le.track_id 
+        FROM core_listen_event le 
+        WHERE le.user_id = u.user_id
+  );
+  
+CREATE OR REPLACE VIEW v_user_top_genres AS
+SELECT
+    le.user_id,
+    g.genre_id,
+    COUNT(*) AS plays
+FROM core_listen_event le
+JOIN music_track_genre tg ON le.track_id = tg.track_id
+JOIN ref_genre g ON tg.genre_id = g.genre_id
+GROUP BY le.user_id, g.genre_id;
+
+
+CREATE OR REPLACE VIEW v_user_favorite_genres AS
+SELECT user_id, genre_id
+FROM (
+    SELECT 
+        user_id,
+        genre_id,
+        plays,
+        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY plays DESC) AS rank_pos
+    FROM v_user_top_genres
+) ranked
+WHERE rank_pos <= 3;   -- top 3 genres
+
+DROP VIEW IF EXISTS v_recommendation_genre;
+
+CREATE VIEW v_recommendation_genre AS
+SELECT 
+    u.user_id,
+    t.track_id,
+
+    -- aggregate title (all rows for same track_id are identical)
+    MAX(t.title) AS title,
+
+    -- combine all artists for the track
+    GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR ', ') AS artist_name,
+
+    -- combine all genres for the track
+    GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ', ') AS genre_name,
+
+    -- track popularity
+    MAX(t.popularity) AS popularity
+
+FROM core_user u
+JOIN v_user_favorite_genres fav 
+    ON fav.user_id = u.user_id
+JOIN music_track_genre tg 
+    ON tg.genre_id = fav.genre_id
+JOIN ref_genre g 
+    ON tg.genre_id = g.genre_id
+JOIN music_track t 
+    ON t.track_id = tg.track_id
+JOIN music_track_artist mta 
+    ON t.track_id = mta.track_id
+JOIN music_artist a 
+    ON mta.artist_id = a.artist_id
+LEFT JOIN core_listen_event le 
+    ON le.user_id = u.user_id 
+   AND le.track_id = t.track_id
+
+WHERE le.track_id IS NULL        -- user has not listened
+  AND t.popularity IS NOT NULL
+
+GROUP BY u.user_id, t.track_id
+
+ORDER BY popularity DESC;
+
+
+
+
+
 
 -- ===========================================
 -- END OF SCHEMA

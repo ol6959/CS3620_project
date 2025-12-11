@@ -8,7 +8,7 @@ DB_CONFIG = {
     "database": "tunetracker",
 }
 
-CSV_PATH = "data/train.csv"    # Kaggle genre dataset
+CSV_PATH = "data/train.csv"      # Kaggle Spotify Genre dataset
 COMMIT_EVERY = 1000
 
 
@@ -18,246 +18,190 @@ def get_conn():
 
 def parse_primary_artist(artists_str: str) -> str:
     """
-    'artists' in train.csv is typically something like:
-    "['Taylor Swift']" or "['Artist1', 'Artist2']"
-    We'll just grab the first name as a string.
+    Extract first artist name from strings like:
+    "['Taylor Swift']"  or "['Drake','21 Savage']"
     """
     if not artists_str:
         return "Unknown Artist"
 
     s = artists_str.strip()
-    # Drop leading/trailing brackets if present
     if s.startswith("[") and s.endswith("]"):
         s = s[1:-1]
 
-    # Split by comma, take first
     first = s.split(",")[0].strip()
-
-    # Strip quotes
-    first = first.strip().strip("'").strip('"')
+    first = first.strip("'").strip('"')
     return first or "Unknown Artist"
 
 
-def import_spotify_option():
+def import_spotify():
     conn = get_conn()
     cursor = conn.cursor(dictionary=True)
+    
+    conn.start_transaction()
 
-    print("🎵 Rebuilding music library from data/train.csv ...\n")
+    print("🎵 Importing Spotify dataset from train.csv...\n")
 
     with open(CSV_PATH, encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         total_rows = 0
-        inserted_tracks = 0
-        inserted_artists = 0
-        inserted_albums = 0
-        inserted_genres = 0
-        track_genre_links = 0
+        new_artists = 0
+        new_albums = 0
+        new_tracks = 0
+        new_genres = 0
+        tg_links = 0
 
         for row in reader:
             total_rows += 1
 
-            spotify_track_id = row.get("track_id")
-            track_name       = row.get("track_name")
-            album_name       = row.get("album_name")
-            artists_raw      = row.get("artists")
-            popularity_raw   = row.get("popularity")
-            duration_ms_raw  = row.get("duration_ms")
-            explicit_raw     = row.get("explicit")
-            danceability     = row.get("danceability")
-            energy           = row.get("energy")
-            valence          = row.get("valence")
-            tempo            = row.get("tempo")
-            acousticness     = row.get("acousticness")
-            instrumentalness = row.get("instrumentalness")
-            liveness         = row.get("liveness")
-            genre_name       = row.get("track_genre")
+            # ----- Extract raw fields -----
+            track_title = row.get("track_name")
+            album_name  = row.get("album_name")
+            artists_raw = row.get("artists")
+            genre_name  = row.get("track_genre")
+            popularity  = row.get("popularity")
+            duration_ms = row.get("duration_ms")
+            explicit    = row.get("explicit")
 
-            # Basic validation
-            if not spotify_track_id or not track_name:
+            if not track_title:
                 continue
 
-            # ---------- Clean scalars ----------
+            # ====== CLEAN & TRUNCATE TEXT FIELDS ======
+            track_title = (track_title or "").strip()
+            if len(track_title) > 255:
+                track_title = track_title[:255]
+
+            album_title = (album_name or "Unknown Album").strip()
+            if len(album_title) > 255:
+                album_title = album_title[:255]
+
+            artists_raw = (artists_raw or "").strip()
+
+            # ====== NUMERIC CLEANUP ======
             try:
-                popularity = int(popularity_raw) if popularity_raw not in (None, "", "NaN") else None
-            except ValueError:
+                popularity = int(popularity) if popularity not in ("", None, "NaN") else None
+            except:
                 popularity = None
 
             try:
-                duration_ms = int(float(duration_ms_raw)) if duration_ms_raw not in (None, "", "NaN") else None
-            except ValueError:
+                duration_ms = int(float(duration_ms)) if duration_ms not in ("", None, "NaN") else None
+            except:
                 duration_ms = None
 
-            # explicit is usually 0/1
-            try:
-                explicit = 1 if str(explicit_raw).strip() in ("1", "True", "true") else 0
-            except Exception:
-                explicit = 0
+            explicit = 1 if str(explicit).strip() in ("1", "True", "true") else 0
 
-            # release_year – we don’t have it in this dataset, so use None
-            release_year = None
-
-            # Primary artist (string)
+            # ====== Extract artist name ======
             artist_name = parse_primary_artist(artists_raw)
 
-            # ---------- Upsert artist ----------
+            # =====================================
+            # 1️⃣ INSERT ARTIST
+            # =====================================
             cursor.execute("""
                 INSERT IGNORE INTO music_artist (name)
                 VALUES (%s)
             """, (artist_name,))
             if cursor.rowcount > 0:
-                inserted_artists += 1
+                new_artists += 1
 
-            cursor.execute("""
-                SELECT artist_id FROM music_artist
-                WHERE name = %s
-                LIMIT 1
-            """, (artist_name,))
+            cursor.execute("SELECT artist_id FROM music_artist WHERE name=%s", (artist_name,))
             arow = cursor.fetchone()
             if not arow:
-                # Shouldn't happen, but skip if no artist_id
                 continue
             artist_id = arow["artist_id"]
 
-            # ---------- Upsert album ----------
-            # We don't have a Spotify album ID or release date,
-            # so we group albums by (album_name, artist_id).
-            album_title = album_name or "Unknown Album"
-
-            # Use a synthetic uniqueness: same title + same artist
+            # =====================================
+            # 2️⃣ INSERT ALBUM (spotify_album_id=NULL)
+            # =====================================
             cursor.execute("""
-                INSERT IGNORE INTO music_album (spotify_album_id, title, release_date, album_type)
-                VALUES (NULL, %s, NULL, 'album')
+                INSERT IGNORE INTO music_album (spotify_album_id, name, release_date)
+                VALUES (NULL, %s, NULL)
             """, (album_title,))
             if cursor.rowcount > 0:
-                inserted_albums += 1
+                new_albums += 1
 
-            cursor.execute("""
-                SELECT album_id FROM music_album
-                WHERE title = %s
-                LIMIT 1
-            """, (album_title,))
+            cursor.execute("SELECT album_id FROM music_album WHERE name=%s LIMIT 1", (album_title,))
             alb = cursor.fetchone()
             if not alb:
                 continue
             album_id = alb["album_id"]
 
-            # ---------- Upsert track with audio features ----------
+            # =====================================
+            # 3️⃣ INSERT TRACK
+            # =====================================
             cursor.execute("""
                 INSERT INTO music_track (
-                    spotify_track_id,
-                    album_id,
                     title,
+                    album_name,
                     duration_ms,
-                    explicit,
-                    release_year,
                     popularity,
-                    danceability,
-                    energy,
-                    valence,
-                    tempo,
-                    acousticness,
-                    instrumentalness,
-                    liveness
+                    is_explicit,
+                    release_year,
+                    release_date,
+                    spotify_id
                 )
-                VALUES (%s, %s, %s, %s, %s,
-                        %s, %s,
-                        %s, %s, %s, %s,
-                        %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    album_id        = VALUES(album_id),
-                    title           = VALUES(title),
-                    duration_ms     = VALUES(duration_ms),
-                    explicit        = VALUES(explicit),
-                    release_year    = VALUES(release_year),
-                    popularity      = VALUES(popularity),
-                    danceability    = VALUES(danceability),
-                    energy          = VALUES(energy),
-                    valence         = VALUES(valence),
-                    tempo           = VALUES(tempo),
-                    acousticness    = VALUES(acousticness),
-                    instrumentalness= VALUES(instrumentalness),
-                    liveness        = VALUES(liveness)
+                VALUES (%s,%s,%s,%s,%s,NULL,NULL,NULL)
             """, (
-                spotify_track_id,
-                album_id,
-                track_name,
+                track_title,
+                album_title,
                 duration_ms,
-                explicit,
-                release_year,
                 popularity,
-                danceability,
-                energy,
-                valence,
-                tempo,
-                acousticness,
-                instrumentalness,
-                liveness
+                explicit
             ))
 
-            if cursor.rowcount > 0:
-                inserted_tracks += 1
+            track_id = cursor.lastrowid
+            new_tracks += 1
 
-            # Get internal track_id
-            cursor.execute("""
-                SELECT track_id FROM music_track
-                WHERE spotify_track_id = %s
-                LIMIT 1
-            """, (spotify_track_id,))
-            trow = cursor.fetchone()
-            if not trow:
-                continue
-            track_id = trow["track_id"]
-
-            # ---------- Track ↔ Artist link ----------
+            # =====================================
+            # 4️⃣ LINK TRACK ↔ ARTIST
+            # =====================================
             cursor.execute("""
                 INSERT IGNORE INTO music_track_artist (track_id, artist_id)
                 VALUES (%s, %s)
             """, (track_id, artist_id))
 
-            # ---------- Genre reference + link ----------
+            # =====================================
+            # 5️⃣ GENRE HANDLING
+            # =====================================
             if genre_name:
                 cursor.execute("""
                     INSERT IGNORE INTO ref_genre (name)
                     VALUES (%s)
                 """, (genre_name,))
                 if cursor.rowcount > 0:
-                    inserted_genres += 1
+                    new_genres += 1
 
-                cursor.execute("""
-                    SELECT genre_id FROM ref_genre
-                    WHERE name = %s
-                    LIMIT 1
-                """, (genre_name,))
+                cursor.execute("SELECT genre_id FROM ref_genre WHERE name=%s", (genre_name,))
                 grow = cursor.fetchone()
                 if grow:
                     genre_id = grow["genre_id"]
+
                     cursor.execute("""
                         INSERT IGNORE INTO music_track_genre (track_id, genre_id)
                         VALUES (%s, %s)
                     """, (track_id, genre_id))
-                    track_genre_links += cursor.rowcount
+                    tg_links += cursor.rowcount
 
-            # ---------- Commit occasionally ----------
+            # =====================================
+            # 🔄 PERIODIC COMMIT
+            # =====================================
             if total_rows % COMMIT_EVERY == 0:
-                conn.commit()
-                print(f"  Processed {total_rows:,} rows...")
+                #conn.commit()
+                print(f"Processed {total_rows:,} rows...")
 
-        # final commit
         conn.commit()
 
     cursor.close()
     conn.close()
 
-    print("\n🎉 DONE importing!")
-    print(f" Rows scanned: {total_rows:,}")
-    print(f" Tracks inserted/updated: {inserted_tracks:,}")
-    print(f" Artists inserted: {inserted_artists:,}")
-    print(f" Albums inserted: {inserted_albums:,}")
-    print(f" Genres inserted: {inserted_genres:,}")
-    print(f" Track-Genre links added: {track_genre_links:,}")
+    print("\n🎉 Spotify Import Complete!")
+    print(f"Rows read:         {total_rows:,}")
+    print(f"New artists:       {new_artists:,}")
+    print(f"New albums:        {new_albums:,}")
+    print(f"New tracks:        {new_tracks:,}")
+    print(f"New genres:        {new_genres:,}")
+    print(f"Track-Genre links: {tg_links:,}")
 
 
 if __name__ == "__main__":
-    import_spotify_option()
+    import_spotify()
 

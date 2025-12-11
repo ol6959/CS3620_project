@@ -51,10 +51,11 @@ def import_indicator_values():
                     continue  # Skip invalid numbers
 
                 cursor.execute("""
-                    INSERT INTO bg_country_indicator
+                    INSERT INTO world_bank_indicator
                         (country_code, indicator_code, year, value)
                     VALUES (%s, %s, %s, %s)
                 """, (country_code, indicator_code, year, val))
+
 
                 inserted += 1
 

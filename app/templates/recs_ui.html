@@ -10,19 +10,26 @@
     <hr>
 
     {% if recs %}
-        <ul>
-        {% for r in recs %}
-            <li>
-                <strong>{{ r.title }}</strong>
-                — {{ r.artist_name or "Unknown Artist" }}
-                | <a href="/listen?track_id={{ r.track_id }}">Log Listen</a>
-                | <a href="/playlist/add_track?track_id={{ r.track_id }}">Add to Playlist</a>
-            </li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>No recommendations yet — listen to a few tracks first!</p>
-    {% endif %}
+            <ul>
+            {% for r in recs %}
+                <li>
+                    <strong>{{ r.title }}</strong>
+                    — {{ r.artists or "Unknown Artist" }}
+
+                    <!-- Log Listen (POST request) -->
+                    <form action="/listen" method="POST" style="display:inline;">
+                        <input type="hidden" name="track_id" value="{{ r.track_id }}">
+                        <button type="submit">Log Listen</button>
+                    </form>
+
+                    <!-- Add to Playlist (GET link still OK) -->
+                    | <a href="/playlist/add_track?track_id={{ r.track_id }}">Add to Playlist</a>
+                </li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>No recommendations yet — listen to a few tracks first!</p>
+        {% endif %}
 
 </body>
 </html>
