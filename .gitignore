@@ -8,8 +8,11 @@ app/data
 venv/
 .env/
 
-# Ignore macOS junk
+# macOS system files
 .DS_Store
+*/.DS_Store
+**/.DS_Store
+
 
 # Ignore MySQL dump attachments
 *.sql

@@ -31,7 +31,6 @@ Build Instructions:
     2. Create databases with sql files under TuneTracker/app
         schema.sql
         analytic_views.sql
-        optional to create some user to start: sample_data.sql
 
     3. Create the schema: mysql -u root -p < db/schema.sql
     
@@ -55,6 +54,8 @@ Build Instructions:
         python import_world_bank_ref.py
         &                                   - populates world_bank_country, indicator, and data
         python import_world_bank_data.py
+        
+        OPTIONAL - Create sample users and playlists with sample_data.sql
         
     8. Confirm everything imported correctly by using the analytic view
 
