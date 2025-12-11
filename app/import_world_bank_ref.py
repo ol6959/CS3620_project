@@ -4,7 +4,7 @@ import mysql.connector
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "Lyo265155!",
+    "password": "YOUR_PASSWORD",
     "database": "tunetracker"
 }
 

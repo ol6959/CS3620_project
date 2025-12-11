@@ -4,7 +4,7 @@ import mysql.connector
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "Lyo265155!",  # <- keep or change as needed
+    "password": "YOUR_PASSWORD",  # <- keep or change as needed
     "database": "tunetracker",
 }
 
