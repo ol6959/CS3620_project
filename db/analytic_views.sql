@@ -1,85 +1,119 @@
+
+-- =============================================
+-- TuneTracker Analytic Views
+-- =============================================
 USE tunetracker;
 
--- ===========================================================
--- VIEW 1: User Listening Dashboard
--- Shows daily listening stats (activity summary feature)
--- ===========================================================
+-- ------------------------------------------------
+-- 1. USER TOP TRACKS
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_user_top_tracks AS
+SELECT 
+    le.user_id,
+    t.track_id,
+    t.title,
+    COUNT(*) AS play_count
+FROM core_listen_event le
+JOIN music_track t ON le.track_id = t.track_id
+GROUP BY le.user_id, t.track_id
+ORDER BY le.user_id, play_count DESC;
 
-CREATE OR REPLACE VIEW v_user_listening_dashboard AS
+
+-- ------------------------------------------------
+-- 2. USER TOP ARTISTS
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_user_top_artists AS
+SELECT 
+    le.user_id,
+    a.artist_id,
+    a.name AS artist_name,
+    COUNT(*) AS play_count
+FROM core_listen_event le
+JOIN music_track_artist mta ON le.track_id = mta.track_id
+JOIN music_artist a ON mta.artist_id = a.artist_id
+GROUP BY le.user_id, a.artist_id
+ORDER BY le.user_id, play_count DESC;
+
+
+-- ------------------------------------------------
+-- 3. USER DAILY STATS (simple version)
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_user_daily_stats AS
+SELECT
+    le.user_id,
+    DATE(le.played_at) AS listen_date,
+    COUNT(*) AS total_listens,
+    COUNT(DISTINCT le.track_id) AS distinct_tracks
+FROM core_listen_event le
+GROUP BY le.user_id, DATE(le.played_at)
+ORDER BY le.user_id, listen_date;
+
+
+-- ------------------------------------------------
+-- 4. GLOBAL TOP TRACKS (TuneTracker only)
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_global_top_tracks AS
+SELECT
+    t.track_id,
+    t.title,
+    COUNT(*) AS play_count
+FROM core_listen_event le
+JOIN music_track t ON le.track_id = t.track_id
+GROUP BY t.track_id
+ORDER BY play_count DESC;
+
+
+-- ------------------------------------------------
+-- 5. GENRE POPULARITY
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_genre_popularity AS
+SELECT
+    g.genre_id,
+    g.name AS genre_name,
+    COUNT(*) AS play_count
+FROM core_listen_event le
+JOIN music_track_genre tg ON le.track_id = tg.track_id
+JOIN ref_genre g ON tg.genre_id = g.genre_id
+GROUP BY g.genre_id
+ORDER BY play_count DESC;
+
+
+-- ------------------------------------------------
+-- 6. GENRE + POPULARITY RECOMMENDATION VIEW
+-- ------------------------------------------------
+CREATE OR REPLACE VIEW v_recommendation_candidates AS
 SELECT
     u.user_id,
-    up.display_name,
-    m.listen_date,
-    m.total_listens,
-    m.unique_tracks,
-    m.minutes_listened
-FROM mart_user_daily_listening m
-JOIN core_user u ON u.user_id = m.user_id
-LEFT JOIN core_user_profile up ON up.user_id = u.user_id
-ORDER BY m.listen_date DESC;
-
-
--- ===========================================================
--- VIEW 2: User Listening vs GDP Context
--- Compares user's listening to their country’s economic metric
--- GDP per capita => indicator_code = 'NY.GDP.PCAP.KD'
--- ===========================================================
-
-CREATE OR REPLACE VIEW v_user_global_context AS
-SELECT
-    u.user_id,
-    up.display_name,
-    up.country_code,
-    c.name AS country_name,
-    ci.year,
-    ci.value AS gdp_per_capita,
-    m.total_listens,
-    m.minutes_listened,
-    ROUND(m.minutes_listened / ci.value, 6) AS listens_to_gdp_ratio
-FROM core_user_profile up
-JOIN core_user u ON u.user_id = up.user_id
-JOIN mart_user_daily_listening m ON m.user_id = up.user_id
-JOIN bg_country_indicator ci ON ci.country_code = up.country_code
-JOIN ref_country c ON c.country_code = up.country_code
-WHERE ci.indicator_code = 'NY.GDP.PCAP.KD'
-ORDER BY ci.value DESC;
-
-
--- ===========================================================
--- VIEW 3: Recommendation Explorer
--- Shows recommended tracks + audio features + reason for rec
--- ===========================================================
-
-CREATE OR REPLACE VIEW v_recommendation_explorer AS
-SELECT
-    r.rec_id,
-    r.user_id,
-    up.display_name,
     t.track_id,
     t.title AS track_title,
-    t.energy,
-    t.danceability,
-    ROUND((t.energy + t.danceability) / 2, 3) AS mainstream_score,
-    r.reason,
-    r.action,
-    r.generated_at
-FROM music_recommendation_event r
-JOIN music_track t ON t.track_id = r.track_id
-LEFT JOIN core_user_profile up ON up.user_id = r.user_id
-ORDER BY r.generated_at DESC;
+    a.name AS artist_name,
+    g.name AS genre_name,
+    t.popularity,
+    
+    -- Weighted score: 70% genre presence, 30% popularity
+    (0.7 * 1 + 0.3 * (t.popularity / 100)) AS rec_score
 
+FROM core_user u
 
--- ===========================================================
--- OPTIONAL BONUS VIEW: Most Played Tracks by Genre
--- Great for demonstrating SQL analytics features
--- ===========================================================
+-- Expand to all tracks the user might like
+CROSS JOIN music_track t
 
-CREATE OR REPLACE VIEW v_top_genres AS
-SELECT
-    g.name AS genre,
-    COUNT(le.listen_id) AS total_listens
-FROM core_listen_event le
-JOIN music_track_genre tg ON tg.track_id = le.track_id
-JOIN ref_genre g ON g.genre_id = tg.genre_id
-GROUP BY g.name
-ORDER BY total_listens DESC;
+-- Attach genres
+JOIN music_track_genre tg ON t.track_id = tg.track_id
+JOIN ref_genre g ON tg.genre_id = g.genre_id
+
+-- Attach artists
+JOIN music_track_artist mta ON t.track_id = mta.track_id
+JOIN music_artist a ON mta.artist_id = a.artist_id
+
+-- Exclude tracks the user has already listened to
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM core_listen_event le
+    WHERE le.user_id = u.user_id
+      AND le.track_id = t.track_id
+)
+
+AND t.popularity IS NOT NULL
+
+ORDER BY u.user_id, rec_score DESC;

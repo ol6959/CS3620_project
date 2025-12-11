@@ -1,261 +1,273 @@
--- ===========================================================
--- DATABASE SETUP
--- ===========================================================
+-- ===========================================
+-- TuneTracker DATABASE SCHEMA
+-- ===========================================
 
-CREATE DATABASE IF NOT EXISTS tunetracker;
+DROP DATABASE IF EXISTS tunetracker;
+CREATE DATABASE tunetracker;
 USE tunetracker;
 
-SET foreign_key_checks = 0;
-
--- ===========================================================
--- DROP TABLES (in correct order for safe re-runs)
--- ===========================================================
-
-DROP TABLE IF EXISTS audit_log;
-DROP TABLE IF EXISTS mart_user_daily_listening;
-DROP TABLE IF EXISTS bg_country_indicator;
-DROP TABLE IF EXISTS ref_indicator;
-DROP TABLE IF EXISTS ref_country;
-DROP TABLE IF EXISTS music_recommendation_event;
-DROP TABLE IF EXISTS music_track_genre;
-DROP TABLE IF EXISTS music_track_artist;
-DROP TABLE IF EXISTS music_track;
-DROP TABLE IF EXISTS music_album;
-DROP TABLE IF EXISTS music_artist;
-DROP TABLE IF EXISTS ref_genre;
-DROP TABLE IF EXISTS core_feedback;
-DROP TABLE IF EXISTS core_track_like;
-DROP TABLE IF EXISTS core_playlist_track;
-DROP TABLE IF EXISTS core_playlist;
-DROP TABLE IF EXISTS core_listen_event;
-DROP TABLE IF EXISTS core_session;
-DROP TABLE IF EXISTS core_user_profile;
-DROP TABLE IF EXISTS core_user;
-
--- ===========================================================
--- REFERENCE TABLES (must come first)
--- ===========================================================
-
-CREATE TABLE ref_country (
-    country_code CHAR(3) PRIMARY KEY,
-    name VARCHAR(100),
-    region VARCHAR(100),
-    income_group VARCHAR(100)
-);
-
-CREATE TABLE ref_indicator (
-    indicator_code VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(255),
-    category VARCHAR(100)
-);
-
-CREATE TABLE ref_genre (
-    genre_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) UNIQUE,
-    description VARCHAR(255)
-);
-
--- ===========================================================
--- CORE USER TABLES
--- ===========================================================
+-- ==========================================
+-- Users & Profiles
+-- ==========================================
 
 CREATE TABLE core_user (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('active', 'disabled') DEFAULT 'active'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE core_user_profile (
     user_id INT PRIMARY KEY,
-    display_name VARCHAR(100),
-    country_code CHAR(3),
+    display_name VARCHAR(255) NOT NULL,
+    country_code VARCHAR(10),
     birth_year INT,
-    privacy_level ENUM('public','friends','private') DEFAULT 'public',
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id),
-    FOREIGN KEY (country_code) REFERENCES ref_country(country_code)
-);
+    avatar_url VARCHAR(500),
 
-CREATE TABLE core_session (
-    session_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATETIME,
-    ip_hash VARCHAR(100),
-    user_agent VARCHAR(255),
     FOREIGN KEY (user_id) REFERENCES core_user(user_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );
 
--- ===========================================================
--- MUSIC CATALOG TABLES (Spotify data)
--- ===========================================================
+CREATE INDEX idx_profile_country ON core_user_profile (country_code);
+CREATE INDEX idx_profile_birthyear ON core_user_profile (birth_year);
+
+
+CREATE TABLE audit_log (
+    audit_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    event_type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES core_user(user_id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+);
+
+
+-- ===========================================
+-- 2. WORLD BANK: REFERENCE TABLES
+-- ===========================================
+
+CREATE TABLE ref_country (
+    country_code VARCHAR(10) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    region VARCHAR(255)
+);
+
+CREATE TABLE ref_indicator (
+    indicator_code VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+
+-- ===========================================
+-- 3. MUSIC DATA (SPOTIFY CLEAN DATASET)
+-- ===========================================
 
 CREATE TABLE music_artist (
     artist_id INT AUTO_INCREMENT PRIMARY KEY,
-    spotify_artist_id VARCHAR(50) UNIQUE,
     name VARCHAR(255) NOT NULL,
-    origin_country_code CHAR(3),
-    FOREIGN KEY (origin_country_code) REFERENCES ref_country(country_code)
+    
+    UNIQUE KEY uq_artist_name (name)
 );
 
 CREATE TABLE music_album (
     album_id INT AUTO_INCREMENT PRIMARY KEY,
-    spotify_album_id VARCHAR(50) UNIQUE,
-    title VARCHAR(255) NOT NULL,
-    release_date DATE,
-    album_type VARCHAR(100)
+    spotify_album_id VARCHAR(100),
+    name VARCHAR(255),
+    release_date DATE NULL
 );
 
 CREATE TABLE music_track (
     track_id INT AUTO_INCREMENT PRIMARY KEY,
-    spotify_track_id VARCHAR(50) UNIQUE,
-    album_id INT,
     title VARCHAR(255) NOT NULL,
+    album_name VARCHAR(255),
     duration_ms INT,
-    explicit BOOLEAN DEFAULT FALSE,
-    release_year INT,
-    danceability DECIMAL(4,3),
-    energy DECIMAL(4,3),
-    valence DECIMAL(4,3),
-    tempo DECIMAL(6,2),
-    acousticness DECIMAL(4,3),
-    instrumentalness DECIMAL(4,3),
-    liveness DECIMAL(4,3),
-    FOREIGN KEY (album_id) REFERENCES music_album(album_id)
+    popularity TINYINT,              -- 0–100 from Spotify
+    is_explicit TINYINT(1) DEFAULT 0,
+    spotify_id VARCHAR(64),          -- optional external ID
+    release_year SMALLINT,           -- optional
+    release_date DATE,               -- optional
+
+    INDEX idx_track_title (title),
+    INDEX idx_track_popularity (popularity),
+    INDEX idx_track_release_year (release_year)
 );
+
 
 CREATE TABLE music_track_artist (
     track_id INT NOT NULL,
     artist_id INT NOT NULL,
-    role ENUM('primary','featured') DEFAULT 'primary',
+
     PRIMARY KEY (track_id, artist_id),
-    FOREIGN KEY (track_id) REFERENCES music_track(track_id),
+
+    FOREIGN KEY (track_id) REFERENCES music_track(track_id)
+        ON DELETE CASCADE,
     FOREIGN KEY (artist_id) REFERENCES music_artist(artist_id)
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE ref_genre (
+    genre_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
 );
 
 CREATE TABLE music_track_genre (
     track_id INT NOT NULL,
     genre_id INT NOT NULL,
-    source ENUM('spotify','lastfm','manual'),
+
     PRIMARY KEY (track_id, genre_id),
-    FOREIGN KEY (track_id) REFERENCES music_track(track_id),
-    FOREIGN KEY (genre_id) REFERENCES ref_genre(genre_id)
-);
 
-CREATE TABLE music_recommendation_event (
-    rec_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    track_id INT NOT NULL,
-    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    reason VARCHAR(255),
-    action ENUM('shown','clicked','ignored','skipped') DEFAULT 'shown',
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id),
     FOREIGN KEY (track_id) REFERENCES music_track(track_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES ref_genre(genre_id)
+        ON DELETE CASCADE
 );
 
--- ===========================================================
--- USER-GENERATED CONTENT (Playlists, listens, likes)
--- ===========================================================
+
+
+-- ===========================================
+-- 4. USER LISTENING EVENTS
+-- ===========================================
 
 CREATE TABLE core_listen_event (
-    listen_id INT AUTO_INCREMENT PRIMARY KEY,
+    listen_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     track_id INT NOT NULL,
     played_at DATETIME NOT NULL,
-    source ENUM('manual','spotify_import','file_upload') DEFAULT 'manual',
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id),
+    source VARCHAR(20) DEFAULT 'manual',
+
+    FOREIGN KEY (user_id) REFERENCES core_user(user_id)
+        ON DELETE CASCADE,
     FOREIGN KEY (track_id) REFERENCES music_track(track_id)
+        ON DELETE RESTRICT
 );
+
+
+-- ===========================================
+-- 5. PLAYLIST SYSTEM
+-- ===========================================
 
 CREATE TABLE core_playlist (
     playlist_id INT AUTO_INCREMENT PRIMARY KEY,
     owner_user_id INT NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_public BOOLEAN DEFAULT TRUE,
+    name VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
     FOREIGN KEY (owner_user_id) REFERENCES core_user(user_id)
+        ON DELETE CASCADE
 );
+
 
 CREATE TABLE core_playlist_track (
     playlist_id INT NOT NULL,
     track_id INT NOT NULL,
-    position INT,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (playlist_id, track_id),
-    FOREIGN KEY (playlist_id) REFERENCES core_playlist(playlist_id) ON DELETE CASCADE,
+    position INT NOT NULL,
+    added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (playlist_id, position),
+
+    UNIQUE KEY uq_playlist_track (playlist_id, track_id),
+
+    FOREIGN KEY (playlist_id) REFERENCES core_playlist(playlist_id)
+        ON DELETE CASCADE,
     FOREIGN KEY (track_id) REFERENCES music_track(track_id)
+        ON DELETE RESTRICT
 );
 
-CREATE TABLE core_track_like (
-    user_id INT NOT NULL,
+
+-- ===========================================
+-- 6. LAST.FM DATASET (PUBLIC DATASET #3)
+-- ===========================================
+
+CREATE TABLE ext_lastfm_listens (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255),
+    artist_name VARCHAR(255),
+    track_name VARCHAR(255),
+    album_name VARCHAR(255),
+    listen_date DATE,
+    listen_time TIME,
+
+    INDEX idx_lastfm_artist (artist_name),
+    INDEX idx_lastfm_track (track_name),
+    INDEX idx_lastfm_date (listen_date)
+);
+
+
+-- Mapping table for Last.fm → Spotify matched tracks
+CREATE TABLE map_lastfm_track (
+    lastfm_id BIGINT NOT NULL,
     track_id INT NOT NULL,
-    liked BOOLEAN DEFAULT TRUE,
-    rated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, track_id),
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id),
+
+    PRIMARY KEY (lastfm_id, track_id),
+
+    FOREIGN KEY (lastfm_id) REFERENCES ext_lastfm_listens(id)
+        ON DELETE CASCADE,
     FOREIGN KEY (track_id) REFERENCES music_track(track_id)
+        ON DELETE CASCADE
 );
 
-CREATE TABLE core_feedback (
-    feedback_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    category ENUM('bug','feature','data_issue','other'),
-    message TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('new','in_review','closed') DEFAULT 'new',
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id)
-);
 
--- ===========================================================
--- BACKGROUND (World Bank WDI Data)
--- ===========================================================
+-- ===========================================
+-- 7. WBI
+-- ===========================================
+CREATE TABLE world_bank_indicator (
+    country_code VARCHAR(10) NOT NULL,
+    indicator_code VARCHAR(50) NOT NULL,
+    year INT NOT NULL,
+    value DOUBLE,
 
-CREATE TABLE bg_country_indicator (
-    country_code CHAR(3),
-    indicator_code VARCHAR(20),
-    year INT,
-    value DECIMAL(18,4),
     PRIMARY KEY (country_code, indicator_code, year),
-    FOREIGN KEY (country_code) REFERENCES ref_country(country_code),
-    FOREIGN KEY (indicator_code) REFERENCES ref_indicator(indicator_code)
-);
 
--- ===========================================================
--- ANALYTICS / Marts
--- ===========================================================
+    FOREIGN KEY (country_code) REFERENCES ref_country(country_code)
+        ON DELETE CASCADE,
+    FOREIGN KEY (indicator_code) REFERENCES ref_indicator(indicator_code)
+        ON DELETE CASCADE
+);
 
 CREATE TABLE mart_user_daily_listening (
-    user_id INT,
-    listen_date DATE,
-    total_listens INT,
-    unique_tracks INT,
+    user_id INT NOT NULL,
+    listen_date DATE NOT NULL,
+    total_listens INT NOT NULL,
+    distinct_tracks INT NOT NULL,
     minutes_listened DECIMAL(10,2),
+
     PRIMARY KEY (user_id, listen_date),
+
     FOREIGN KEY (user_id) REFERENCES core_user(user_id)
+        ON DELETE CASCADE
 );
 
--- ===========================================================
--- AUDIT LOG
--- ===========================================================
 
-CREATE TABLE audit_log (
-    audit_id INT AUTO_INCREMENT PRIMARY KEY,
-    event_ts DATETIME DEFAULT CURRENT_TIMESTAMP,
-    user_id INT,
-    event_type ENUM('login','logout','signup','create_playlist','add_listen','like_track','feedback'),
-    entity_type VARCHAR(100),
-    entity_id INT,
-    details JSON,
-    FOREIGN KEY (user_id) REFERENCES core_user(user_id)
-);
 
--- ===========================================================
--- PERFORMANCE INDEXES
--- ===========================================================
 
-CREATE INDEX idx_listen_user_date ON core_listen_event (user_id, played_at);
-CREATE INDEX idx_country_indicator ON bg_country_indicator (indicator_code, year);
-CREATE INDEX idx_track_features ON music_track (release_year, energy, danceability);
 
-SET foreign_key_checks = 1;
+-- Recommendation Explorer (Genre-Based)
+CREATE OR REPLACE VIEW v_recommendation_explorer AS
+SELECT
+    u.user_id,
+    t.track_id,
+    t.title AS track_title,
+    a.name AS artist_name,
+    g.name AS genre_name,
+    t.popularity
+FROM core_user u
+CROSS JOIN music_track t
+JOIN music_track_genre tg ON t.track_id = tg.track_id
+JOIN ref_genre g ON tg.genre_id = g.genre_id
+JOIN music_track_artist mta ON t.track_id = mta.track_id
+JOIN music_artist a ON mta.artist_id = a.artist_id
+WHERE t.popularity IS NOT NULL
+  AND t.track_id NOT IN (
+      SELECT track_id FROM core_listen_event le
+      WHERE le.user_id = u.user_id
+  )
+GROUP BY u.user_id, t.track_id;
+
+-- ===========================================
+-- END OF SCHEMA
+-- ===========================================
