@@ -74,8 +74,27 @@ JOIN music_track_genre tg ON le.track_id = tg.track_id
 JOIN ref_genre g ON tg.genre_id = g.genre_id
 GROUP BY le.user_id, g.genre_id;
 
+-- ---------------------------------------------------------
+-- 6. FAVORITE GENRES PER USER (Top 3) - USED WITH v_recommendation_genre
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW v_user_favorite_genres AS
+SELECT user_id, genre_id, genre_name, listen_count
+FROM (
+    SELECT
+        v.user_id,
+        v.genre_id,
+        v.genre_name,
+        v.listen_count,
+        DENSE_RANK() OVER (
+            PARTITION BY v.user_id
+            ORDER BY v.listen_count DESC
+        ) AS rnk
+    FROM v_user_genre_listens v
+) ranked
+WHERE rnk <= 3;
+
 -- ------------------------------------------------
--- 6. GLOBAL TOP TRACKS (TuneTracker only)
+-- 7. GLOBAL TOP TRACKS (TuneTracker only)
 -- ------------------------------------------------
 CREATE OR REPLACE VIEW v_global_top_tracks AS
 SELECT
@@ -89,7 +108,7 @@ ORDER BY play_count DESC;
 
 
 -- ------------------------------------------------
--- 7. GENRE POPULARITY
+-- 8. GENRE POPULARITY
 -- ------------------------------------------------
 CREATE OR REPLACE VIEW v_genre_popularity AS
 SELECT
@@ -104,7 +123,7 @@ ORDER BY play_count DESC;
 
 
 -- ------------------------------------------------
--- 8. GENRE + POPULARITY RECOMMENDATION VIEW
+-- 9. GENRE + POPULARITY RECOMMENDATION VIEW
 -- ------------------------------------------------
 CREATE OR REPLACE VIEW v_recommendation_candidates AS
 SELECT
@@ -114,7 +133,6 @@ SELECT
     a.name AS artist_name,
     g.name AS genre_name,
     t.popularity,
-    
     -- Weighted score: 70% genre presence, 30% popularity
     (0.7 * 1 + 0.3 * (t.popularity / 100)) AS rec_score
 FROM core_user u
@@ -138,7 +156,7 @@ ORDER BY u.user_id, rec_score DESC;
 
 
 -- ---------------------------------------------------------
--- 9. DETAIL VIEW FOR USER LISTEN HISTORY
+-- 10. DETAIL VIEW FOR USER LISTEN HISTORY
 -- ---------------------------------------------------------
 CREATE OR REPLACE VIEW v_user_listen_history AS
 SELECT
@@ -162,7 +180,7 @@ ORDER BY le.played_at DESC;
 
 
 -- ------------------------------------------------
--- 10. RECOMEND GENRES _ USED OVER v_recommendation_candidates (MAIN FOR RECS)
+-- 11. RECOMEND GENRES _ USED OVER v_recommendation_candidates (MAIN FOR RECS)
 -- ------------------------------------------------
 DROP VIEW IF EXISTS v_recommendation_genre;
 CREATE VIEW v_recommendation_genre AS
