@@ -6,6 +6,11 @@ Description:
 
 
 
+ERD:
+    The ER Diagram can be found in the documentation folder as a .drawio file. The red tables are strong entities, the green are associative entities, and blue are weak entities.
+    
+
+
 Databases Used:
 
     Spotify Tracks Genres:
