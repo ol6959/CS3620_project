@@ -35,6 +35,7 @@ Build Instructions:
     4. Create databases by running sql files under TuneTracker/app
         schema.sql
         analytic_views.sql
+        (DO NOT RUN sample_data.sql yet until we have importing song data)
     
     5. Update all the import python scripts under TuneTracker/app to match your SQL user login. It should look something like this before:
             db = mysql.connector.connect(
