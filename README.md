@@ -3,11 +3,13 @@ By: Owen Lyons
 
 Description:
     This is an app that lets user log their music listening habits and see recomendations on what to listen to based on other peoples' and their own listening habits.
-
+    The app allows users to make a profile and log in. Once logged in there are menus to log songs they've listened to, make a playlist, and add songs to them. There is also a tab to receive reccomendations based on what other profiles have listened to and based on the genre of songs you've listened to before. You can see internet usage in your country to see how many other people there use the internet. And based on lastfm's usage you can see songs that are trending.
 
 
 ERD:
     The ER Diagram can be found in the documentation folder as a .drawio file. The red tables are strong entities, the green are associative entities, and blue are weak entities.
+    
+YouTube demo link: https://youtu.be/Mfm3U_ZIkCc
     
 
 
@@ -25,6 +27,7 @@ Databases Used:
     
 
 Build Instructions:
+
     1. Install python and packages under requirements.txt with:
         pip install -r requirements.txt
         I used a venv using these commands
@@ -78,7 +81,7 @@ Build Instructions:
         SELECT COUNT(*) FROM ref_country;
         SELECT COUNT(*) FROM world_bank_indicator;
         
-        should get results around:
+        should get results at:
         113999
         31407
         181153
@@ -88,3 +91,17 @@ Build Instructions:
     8. run program with python main.py
 
 
+    9. Run these for analytic views
+        SELECT * FROM `v_genre_popularity`;
+        SELECT * FROM `v_global_top_tracks`;
+        SELECT * FROM `v_recommendation_candidates`;
+        SELECT * FROM `v_user_daily_stats`;
+        SELECT * FROM `v_user_favorite_genres`;
+        SELECT * FROM `v_user_genre_listens`;
+        SELECT * FROM `v_user_listen_history`;
+        SELECT * FROM `v_user_top_artists`;
+        SELECT * FROM `v_user_top_genres`;
+        SELECT * FROM `v_user_top_tracks`;
+        
+        
+    10. run this to see all users signed in and password if you would like to use them: SELECT * FROM core_user;
