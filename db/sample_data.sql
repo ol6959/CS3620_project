@@ -51,15 +51,14 @@ VALUES
 
 -- --------------------------------------------
 -- 4. PLAYLIST TRACKS
--- ⚠ Replace 101/102/103 with real track_id values from your DB
 -- --------------------------------------------
 INSERT INTO core_playlist_track (playlist_id, track_id, position)
 VALUES
-    (1, 101, 1),
-    (1, 102, 2),
-    (2, 103, 1),
-    (3, 101, 1),
-    (3, 103, 2);
+    ((SELECT playlist_id FROM core_playlist WHERE name = 'Alice Favorites'), 3060, 1),
+    ((SELECT playlist_id FROM core_playlist WHERE name = 'Alice Favorites'), 20717, 2),
+    ((SELECT playlist_id FROM core_playlist WHERE name = 'Chill Mix'), 81556, 1),
+    ((SELECT playlist_id FROM core_playlist WHERE name = 'Chill Mix'), 44001, 2),
+    ((SELECT playlist_id FROM core_playlist WHERE name = 'Bob Workout Hits'), 3060, 1);
 
 
 -- --------------------------------------------
